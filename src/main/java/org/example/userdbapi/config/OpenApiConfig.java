@@ -7,14 +7,12 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class OpenApiConfig {
-
     @Bean
-    public OpenAPI customOpenAPI() {
+    public OpenAPI api() {
         return new OpenAPI()
                 .info(new Info()
                         .title("User API")
-                        .version("1.0")
-                        .description("API для управления пользователями (создание, чтение, обновление, удаление)")
-                );
+                        .version("v1"));
     }
 }
+

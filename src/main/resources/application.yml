@@ -11,3 +11,13 @@ spring:
       hibernate.format_sql: true
 server:
   port: 8080
+
+springdoc:
+  packages-to-scan: org.example.userdbapi.controller
+  paths-to-match: /api/**
+
+logging:
+  level:
+    org.springdoc: DEBUG
+    org.springframework.web: INFO
+
