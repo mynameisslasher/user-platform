@@ -18,3 +18,5 @@ mvnw.cmd
 
 # Build tools
 out/
+/HELP.md
+/mvnw

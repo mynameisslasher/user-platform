@@ -1,5 +1,6 @@
 package org.example.userdbapi.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.userdbapi.dto.UserCreateDto;
 import org.example.userdbapi.dto.UserDto;
@@ -19,14 +20,10 @@ import static org.example.userdbapi.mapper.UserMapper.*;
 @Slf4j
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class UserService {
 
     private final UserRepository userRepository;
-
-    // Dependency Injection через конструктор
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
 
     @Transactional(readOnly = true)
     public List<UserDto> getAllUsers() {
@@ -43,7 +40,7 @@ public class UserService {
 
     public UserDto createUser(UserCreateDto dto) {
         if (userRepository.existsByEmail(dto.email()))
-            throw new ConflictException("Email already exists" + dto.email());
+            throw new ConflictException("Email already exists: %s".formatted(dto.email()));
 
         User saved = userRepository.save(fromCreate(dto));
         log.info("Created user id = {} with email {}", saved.getId(), saved.getEmail());
@@ -54,7 +51,7 @@ public class UserService {
         User u = userRepository.findById(id).orElseThrow(() -> new NotFoundException("User %d not found".formatted(id)));
 
         if (!u.getEmail().equals(dto.email()) && userRepository.existsByEmail(dto.email()))
-            throw new ConflictException("Email already exists" + dto.email());
+            throw new ConflictException("Email already exists: %s".formatted(dto.email()));
 
         applyUpdate(dto, u);
         User saved = userRepository.save(u);

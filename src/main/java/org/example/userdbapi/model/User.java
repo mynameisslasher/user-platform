@@ -21,6 +21,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(nullable = false)
     private Integer age;
 
     @Column(name = "created_at", nullable = false)

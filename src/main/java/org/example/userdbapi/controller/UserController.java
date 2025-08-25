@@ -1,11 +1,11 @@
 package org.example.userdbapi.controller;
 
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.example.userdbapi.dto.UserCreateDto;
 import org.example.userdbapi.dto.UserDto;
 import org.example.userdbapi.dto.UserUpdateDto;
-import org.example.userdbapi.model.User;
 import org.example.userdbapi.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,15 +16,12 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
 
-    public UserController(UserService userService) {
-        this.userService = userService;
-    }
-
-    @GetMapping
+    @GetMapping()
     public List<UserDto> getAll() {
         return userService.getAllUsers();
     }
