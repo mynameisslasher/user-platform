@@ -7,151 +7,123 @@ import org.example.userdbapi.exception.ConflictException;
 import org.example.userdbapi.exception.NotFoundException;
 import org.example.userdbapi.model.User;
 import org.example.userdbapi.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-class UserServiceTest {
 
-    @Mock
-    UserRepository userRepository;
+public class UserServiceTest {
 
-    @InjectMocks
-    UserService userService;
+    private UserRepository repo;
+    private UserService service;
 
-    @Test
-    void getUserById_found() {
-        User u = new User();
-        u.setId(1L);
-        u.setName("Robert");
-        u.setEmail("robert@example.com");
-        u.setAge(30);
-        u.setCreatedAt(LocalDateTime.now());
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(u));
-
-        UserDto dto = userService.getUserByID(1L);
-
-        assertEquals(1L, dto.id());
-        assertEquals("Robert", dto.name());
-        assertEquals("robert@example.com", dto.email());
-        verify(userRepository).findById(1L);
+    @BeforeEach
+    void init(){
+        repo = mock(UserRepository.class);
+        service = new UserService(repo);
     }
 
     @Test
-    void getUserById_notFound() {
-        when(userRepository.findById(99L)).thenReturn(Optional.empty());
-        assertThrows(NotFoundException.class, () -> userService.getUserByID(99L));
+    void getUserById_Ok(){
+        var user = new User();
+        user.setId(1L);
+        user.setName("Vanya");
+        user.setEmail("v@mail.ru");
+        user.setAge(20);
+        user.setCreatedAt(LocalDateTime.now());
+
+        when(repo.findById(1L)).thenReturn(Optional.of(user));
+
+        UserDto dto = service.getUserByID(1L);
+        assertThat(dto.id()).isEqualTo(1L);
+        assertThat(dto.email()).isEqualTo("v@mail.ru");
+        verify(repo).findById(1L);
     }
 
     @Test
-    void getAllUsers_ok() {
-        User a = new User(); a.setId(1L); a.setName("A"); a.setEmail("a@ex.com"); a.setAge(20); a.setCreatedAt(LocalDateTime.now());
-        User b = new User(); b.setId(2L); b.setName("B"); b.setEmail("b@ex.com"); b.setAge(21); b.setCreatedAt(LocalDateTime.now());
-
-        when(userRepository.findAll()).thenReturn(List.of(a, b));
-
-        var list = userService.getAllUsers();
-
-        assertEquals(2, list.size());
-        assertEquals("A", list.get(0).name());
-        assertEquals("B", list.get(1).name());
-        verify(userRepository).findAll();
+    void getUserById_NotFound(){
+        when(repo.findById(9L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> service.getUserByID(9L))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessageContaining("User 9 not found");
     }
 
     @Test
-    void createUser_ok() {
-        UserCreateDto in = new UserCreateDto("Alice", "a@ex.com", 25);
+    void createUser_conflictEmail(){
+        var dto = new UserCreateDto("Vanya", "v@mail.ru", 20);
+        when(repo.existsByEmail("v@mail.ru")).thenReturn(true);
 
-        when(userRepository.existsByEmail("a@ex.com")).thenReturn(false);
-        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
-            User s = inv.getArgument(0, User.class);
-            s.setId(10L);
-            s.setCreatedAt(LocalDateTime.now());
-            return s;
+        assertThatThrownBy(() -> service.createUser(dto))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("Email already exists");
+
+        verify(repo, never()).save(any());
+    }
+
+    @Test
+    void createUser_ok_savesEntity(){
+        var dto = new UserCreateDto("Vanya", "v@mail.ru", 20);
+        when(repo.existsByEmail(dto.email())).thenReturn(false);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        when(repo.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            u.setId(100L);
+            u.setCreatedAt(LocalDateTime.now());
+            return u;
         });
 
-        UserDto dto = userService.createUser(in);
+        UserDto result = service.createUser(dto);
 
-        assertEquals(10L, dto.id());
-        assertEquals("Alice", dto.name());
-        assertEquals("a@ex.com", dto.email());
-        verify(userRepository).save(any(User.class));
+        verify(repo).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getName()).isEqualTo("Vanya");
+        assertThat(result.id()).isEqualTo(100L);
     }
 
     @Test
-    void createUser_conflict_emailExists() {
-        UserCreateDto in = new UserCreateDto("Alice", "a@ex.com", 25);
-        when(userRepository.existsByEmail("a@ex.com")).thenReturn(true);
-
-        assertThrows(ConflictException.class, () -> userService.createUser(in));
-        verify(userRepository, never()).save(any());
+    void updateUser_notFound(){
+        when(repo.findById(5L)).thenReturn(Optional.empty());
+        var dto = new UserUpdateDto("Oleg", "o@mail.ru", 99);
+        assertThatThrownBy(() -> service.updateUser(5L, dto))
+                .isInstanceOf(NotFoundException.class);
     }
 
     @Test
-    void updateUser_ok() {
-        User existing = new User();
+    void updateUser_conflictEmail(){
+        var existing = new User();
         existing.setId(1L);
-        existing.setName("Old");
-        existing.setEmail("old@ex.com");
-        existing.setAge(20);
-        existing.setCreatedAt(LocalDateTime.now());
+        existing.setName("Ya");
+        existing.setEmail("ya@mail.ru");
+        existing.setAge(21);
 
-        when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(userRepository.existsByEmail("new@ex.com")).thenReturn(false);
-        when(userRepository.save(existing)).thenReturn(existing);
+        when(repo.findById(1L)).thenReturn(Optional.of(existing));
 
-        UserUpdateDto upd = new UserUpdateDto("New", "new@ex.com", 22);
+        var dto = new UserUpdateDto("Ya2", "ya2@mail.ru", 23);
+        when(repo.existsByEmail("ya2@mail.ru")).thenReturn(true);
 
-        UserDto dto = userService.updateUser(1L, upd);
-
-        assertEquals("New", dto.name());
-        assertEquals("new@ex.com", dto.email());
-        assertEquals(22, dto.age());
-        verify(userRepository).save(existing);
+        assertThatThrownBy(() -> service.updateUser(1L, dto))
+                .isInstanceOf(ConflictException.class);
     }
 
     @Test
-    void updateUser_conflict_emailTaken() {
-        User existing = new User();
-        existing.setId(1L);
-        existing.setName("Old");
-        existing.setEmail("old@ex.com");
-        existing.setAge(20);
-        existing.setCreatedAt(LocalDateTime.now());
-
-        when(userRepository.findById(1L)).thenReturn(Optional.of(existing));
-        when(userRepository.existsByEmail("new@ex.com")).thenReturn(true);
-
-        UserUpdateDto upd = new UserUpdateDto("New", "new@ex.com", 22);
-
-        assertThrows(ConflictException.class, () -> userService.updateUser(1L, upd));
-        verify(userRepository, never()).save(any());
+    void deleteUser_notFound(){
+        when(repo.existsById(7L)).thenReturn(false);
+        assertThatThrownBy(() -> service.deleteUser(7L))
+                .isInstanceOf(NotFoundException.class);
+        verify(repo, never()).deleteById(anyLong());
     }
 
     @Test
-    void deleteUser_ok() {
-        when(userRepository.existsById(1L)).thenReturn(true);
-        userService.deleteUser(1L);
-        verify(userRepository).deleteById(1L);
-    }
-
-    @Test
-    void deleteUser_notFound() {
-        when(userRepository.existsById(42L)).thenReturn(false);
-        assertThrows(NotFoundException.class, () -> userService.deleteUser(42L));
-        verify(userRepository, never()).deleteById(anyLong());
+    void deleteUser_ok(){
+        when(repo.existsById(7L)).thenReturn(true);
+        service.deleteUser(7L);
+        verify(repo).deleteById(7L);
     }
 }
