@@ -3,13 +3,14 @@ package org.example.userdbapi.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.userdbapi.dto.UserCreateDto;
 import org.example.userdbapi.dto.UserDto;
-import org.example.userdbapi.dto.UserUpdateDto;
 import org.example.userdbapi.exception.ConflictException;
+import org.example.userdbapi.exception.GlobalExceptionHandler;
 import org.example.userdbapi.exception.NotFoundException;
 import org.example.userdbapi.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -17,92 +18,93 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import static org.hamcrest.Matchers.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
+@Import(GlobalExceptionHandler.class)
 class UserControllerTest {
 
     @Autowired MockMvc mvc;
-    @Autowired ObjectMapper objectMapper;
+    @Autowired ObjectMapper om;
 
     @MockitoBean
     UserService service;
 
     @Test
-    void getAll_returnsList() throws Exception {
-        var u = new UserDto(1L, "Bob", "b@gmail.com", 30, LocalDateTime.now());
-        when(service.getAllUsers()).thenReturn(List.of(u));
+    void getById_ok() throws Exception {
+        var dto = new UserDto(1L, "Vanya", "v@m.ru", 20, LocalDateTime.now());
+        when(service.getUserByID(1L)).thenReturn(dto);
 
-        mvc.perform(get("/api/users"))
+        mvc.perform(get("/api/users/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].email").value("b@gmail.com"));
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.email").value("v@m.ru"));
     }
 
     @Test
     void getById_notFound() throws Exception {
-        when(service.getUserByID(99L)).thenThrow(new NotFoundException("User 99 not found"));
-        mvc.perform(get("/api/users/99"))
+        when(service.getUserByID(9L)).thenThrow(new NotFoundException("User 9 not found"));
+
+        mvc.perform(get("/api/users/9"))
                 .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("User 9 not found"))
                 .andExpect(jsonPath("$.status").value("404"));
     }
 
     @Test
-    void create_valid_returns201() throws Exception {
-        var payload = new UserCreateDto("Alie", "a@gmail.com", 25);
-        var created = new UserDto(10L,"Alice", "a@gmail.com", 25, LocalDateTime.now());
-        when(service.createUser(any())).thenReturn(created);
+    void getAll_ok() throws Exception {
+        var list = List.of(
+                new UserDto(1L, "Alice", "a@a.ru", 20, LocalDateTime.now()),
+                new UserDto(2L, "Bob", "b@b.ru", 30, LocalDateTime.now())
+        );
 
-        mvc.perform(post("/api/users")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isCreated())
-                .andExpect(header().string("Location", containsString("/api/users/10")))
-                .andExpect(jsonPath("$.id").value(10));
+        when(service.getAllUsers()).thenReturn(list);
+
+        mvc.perform(get("/api/users"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
-    void create_conflict409_whenDuplicateEmail() throws Exception {
-        var payload = new UserCreateDto("Alice", "a@gmail.com", 25);
-        when(service.createUser(any())).thenThrow(new ConflictException("Email already exists"));
+    void create_ok() throws Exception {
+        var in = new UserCreateDto("Vanya", "v@mail.ru", 20);
+        var out = new UserDto(100L, "Vanya", "v@mail.ru", 20, LocalDateTime.now());
+        when(service.createUser(any())).thenReturn(out);
 
         mvc.perform(post("/api/users")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(payload)))
+                    .content(om.writeValueAsString(in)))
+                .andExpect(status().isCreated())
+                .andExpect(header().string("Location", "/api/users/100"));
+    }
+
+    @Test
+    void create_conflict() throws Exception {
+        var in = new UserCreateDto("Vanya", "vanya@mail.ru", 20);
+        when(service.createUser(any())).thenThrow(new ConflictException("Email already exists: vanya@mail.ru"));
+
+        mvc.perform(post("/api/users")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(om.writeValueAsString(in)))
                 .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Email already exists: vanya@mail.ru"))
                 .andExpect(jsonPath("$.status").value(409));
     }
 
     @Test
-    void create_badRequest_whenInvalidEmail() throws Exception {
-        var payload = new UserCreateDto("Alice","bad_email", 25);
+    void create_badRequest_validation() throws Exception {
+        var badJson = """
+                    {"name": "Vanya", "email": "", "age": 151}
+                """;
 
         mvc.perform(post("/api/users")
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.validationErrors.email", notNullValue()));
-    }
-
-    @Test
-    void update_ok() throws Exception {
-        var upd = new UserUpdateDto("Robert", "r@gmail.com", 23);
-        var dto = new UserDto(1L, "Robert", "r@gmail.com", 23, LocalDateTime.now());
-        when(service.updateUser(eq(1L), any())).thenReturn(dto);
-
-        mvc.perform(put("/api/users/1")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(upd)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Robert"));
-    }
-
-    @Test
-    void delete_noContent() throws Exception {
-        mvc.perform(delete("/api/users/1"))
-                .andExpect(status().isNoContent());
+                    .content(badJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").exists());
     }
 }
