@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/userdb
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate.format_sql: true
+server:
+  port: 8080
+
+springdoc:
+  packages-to-scan: org.example.userdbapi.controller
+  paths-to-match: /api/**
+
+logging:
+  level:
+    org.springdoc: DEBUG
+    org.springframework.web: INFO
+
