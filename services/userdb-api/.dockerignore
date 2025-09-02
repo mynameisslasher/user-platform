@@ -1,6 +1,7 @@
 target/
 .idea/
-.iml
-.git/
-.gitignore
+*.iml
+*.log
+node_modules/
+.git
 .DS_Store

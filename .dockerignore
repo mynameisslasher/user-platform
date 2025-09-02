@@ -1,5 +1,12 @@
-.git/
-.idea/
-**/target/
-**/*.iml
+.git
 .DS_Store
+**/.idea
+**/*.iml
+
+# build-артефакты
+**/target
+**/out
+
+# прочее лишнее
+**/node_modules
+**/*.log
