@@ -1,31 +1,5 @@
-server:
-  port: 8080
-
 spring:
-  datasource:
-    # Используем имя сервиса из docker-compose, а не localhost
-    url: jdbc:postgresql://postgres:5432/userdb
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
-  jpa:
-    hibernate:
-      ddl-auto: update
-    open-in-view: false
-    properties:
-      hibernate.format_sql: true
-  kafka:
-    # В контейнерах Kafka доступна как "kafka:9092"
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-    properties:
-      spring.json.add.type.headers: false
-
-app:
-  kafka:
-    user-topic: ${APP_KAFKA_USER_TOPIC:user.account}
-
-springdoc:
-  packages-to-scan: org.example.userdbapi.controller
-  paths-to-match: /api/**
+  application:
+    name: userdb-api
+  config:
+    import: "optional:configserver:http://config:8888"

@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: userdb-api
+  datasource:
+    url: jdbc:postgresql://postgres:5432/userdb
+    username: postgres
+    password: postgres
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate.format_sql: true
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    properties:
+      spring.json.add.type.headers: false
+
+app:
+  kafka:
+    user-topic: user.account
+
+server:
+  port: 8080
+
+springdoc:
+  packages-to-scan: org.example.userdbapi.controller
+  paths-to-match: /api/**
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

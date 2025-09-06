@@ -1,0 +1,45 @@
+server:
+  port: 8081
+
+app:
+  kafka:
+    user-topic: user.account
+
+spring:
+  application:
+    name: notification-service
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: notification-service
+      auto-offset-reset: earliest
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: org.example.notificationservice.events.UserEvent
+
+  mail:
+    host: mailpit
+    port: 1025
+    properties:
+      mail.smtp.auth: false
+      mail.smtp.starttls.enable: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

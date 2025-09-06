@@ -58,15 +58,6 @@ public class GlobalExceptionHandler {
                 .body(new ErrorPayload(status.value(), status.getReasonPhrase(), message, req.getRequestURI()));
     }
 
-    // 500
-//    @ExceptionHandler(Exception.class)
-//    public ResponseEntity<ErrorPayload> handleUnexpected(Exception ex, HttpServletRequest req) {
-//        var status  = HttpStatus.INTERNAL_SERVER_ERROR;
-//        log.error("{} {} -> {}", req.getMethod(), req.getRequestURI(), ex.getMessage(), ex);
-//        return ResponseEntity.status(status)
-//                .body(new ErrorPayload(status.value(), status.getReasonPhrase(), "Unexpected Error", req.getRequestURI()));
-//    }
-
     // helper
     private void warn(HttpServletRequest req, String msg) {
         log.warn("{} {} -> {}", req.getMethod(), req.getRequestURI(), msg);

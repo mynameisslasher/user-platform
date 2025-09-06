@@ -1,4 +1,5 @@
-package org.example.userdbapi.config;
+package org.example.notificationservice.config;
+
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
@@ -19,7 +20,7 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("User API")
                         .version("1.0")
-                        .description("API для управления пользователями: просмотр, создание, обновление и удаление")
+                        .description("API для отправки почтовых сообщений")
                         .contact(new Contact()
                                 .name("Robert")
                                 .email("robertp@mail.ru")
@@ -30,4 +31,3 @@ public class OpenApiConfig {
                 );
     }
 }
-

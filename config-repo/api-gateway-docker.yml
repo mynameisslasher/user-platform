@@ -1,0 +1,89 @@
+springdoc:
+  swagger-ui:
+    urls:
+      - name: USERDB-API
+        url: /userdb-api/v3/api-docs
+      - name: NOTIFICATION-SERVICE
+        url: /notification-service/v3/api-docs
+
+spring:
+  application:
+    name: api-gateway
+
+  config:
+    import: "optional:configserver:http://config:8888"
+
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 2000
+        response-timeout: 5s
+      routes:
+        - id: userdb-api
+          uri: lb://USERDB-API
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: userdbCB
+                fallbackUri: forward:/fallback/users
+
+        - id: notification-service
+          uri: lb://NOTIFICATION-SERVICE
+          predicates:
+            - Path=/api/notifications/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: notifCB
+                fallbackUri: forward:/fallback/notifications
+
+        - id: userdb-openapi
+          uri: lb://USERDB-API
+          predicates: [ Path=/userdb-api/v3/api-docs/** ]
+          filters:
+            - RewritePath=/userdb-api/(?<p>.*), /${p}
+
+        - id: notification-openapi
+          uri: lb://NOTIFICATION-SERVICE
+          predicates: [ Path=/notification-service/v3/api-docs/** ]
+          filters:
+            - RewritePath=/notification-service/(?<p>.*), /${p}
+
+resilience4j:
+  timelimiter:
+    instances:
+      userdbCB:
+        timeoutDuration: 2s
+      notifCB:
+        timeoutDuration: 2s
+  circuitbreaker:
+    instances:
+      userdbCB:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+      notifCB:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,env,gateway,metrics

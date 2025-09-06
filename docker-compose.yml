@@ -4,10 +4,18 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
     ports: [ "2181:2181" ]
+    healthcheck:
+      test: ["CMD-SHELL", "echo srvr | nc -w 2 localhost 2181 | grep -q '^Mode:'"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+      start_period: 10s
 
   kafka:
     image: confluentinc/cp-kafka:7.6.1
-    depends_on: [ zookeeper ]
+    depends_on:
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -38,7 +46,15 @@ services:
     build:
       context: .
       dockerfile: services/userdb-api/Dockerfile
-    depends_on: [ kafka, postgres ]
+    depends_on:
+      kafka:
+        condition: service_started
+      postgres:
+        condition: service_started
+      config:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/userdb
@@ -46,20 +62,105 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       APP_KAFKA_USER_TOPIC: user.account
-    ports: [ "8080:8080" ]
+      SPRING_CONFIG_IMPORT: configserver:http://config:8888
+      SPRING_CLOUD_CONFIG_FAIL_FAST: "true"
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: "12"
+      SPRING_CLOUD_CONFIG_RETRY_INITIAL_INTERVAL: "1000"
+      SPRING_CLOUD_CONFIG_RETRY_MULTIPLIER: "1.5"
+      SPRING_CLOUD_CONFIG_RETRY_MAX_INTERVAL: "10000"
+      SPRING_APPLICATION_NAME: userdb-api
+      JAVA_TOOL_OPTIONS: -Deureka.client.service-url.defaultZone=http://discovery:8761/eureka/
+    # ports: [ "8080:8080" ]
 
   notification-service:
     build:
       context: .
       dockerfile: services/notification-service/Dockerfile
-    depends_on: [ kafka, mailpit ]
+    depends_on:
+      kafka:
+        condition: service_started
+      mailpit:
+        condition: service_started
+      config:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: docker
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       APP_KAFKA_USER_TOPIC: user.account
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: 1025
-    ports: [ "8081:8081" ]
+      SPRING_APPLICATION_NAME: notification-service
+      SPRING_CONFIG_IMPORT: configserver:http://config:8888
+      SPRING_CLOUD_CONFIG_FAIL_FAST: "true"
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: "12"
+      SPRING_CLOUD_CONFIG_RETRY_INITIAL_INTERVAL: "1000"
+      SPRING_CLOUD_CONFIG_RETRY_MULTIPLIER: "1.5"
+      SPRING_CLOUD_CONFIG_RETRY_MAX_INTERVAL: "10000"
+      JAVA_TOOL_OPTIONS: -Deureka.client.service-url.defaultZone=http://discovery:8761/eureka/
+    # ports: [ "8081:8081" ]
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: api-gateway-1
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_APPLICATION_NAME: api-gateway
+      SPRING_CONFIG_IMPORT: configserver:http://config:8888
+      SPRING_CLOUD_CONFIG_FAIL_FAST: "true"
+      SPRING_CLOUD_CONFIG_RETRY_MAX_ATTEMPTS: "12"
+      SPRING_CLOUD_CONFIG_RETRY_INITIAL_INTERVAL: "1000"
+      SPRING_CLOUD_CONFIG_RETRY_MULTIPLIER: "1.5"
+      SPRING_CLOUD_CONFIG_RETRY_MAX_INTERVAL: "10000"
+      JAVA_TOOL_OPTIONS: -Deureka.client.service-url.defaultZone=http://discovery:8761/eureka/
+    ports: ["8080:8080"]
+    depends_on:
+      config:
+        condition: service_healthy
+      discovery:
+        condition: service_healthy
+
+  discovery:
+    build:
+      context: .
+      dockerfile: services/discovery-server/Dockerfile
+    container_name: discovery-1
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_CONFIG_IMPORT=optional:configserver:http://config:8888
+      - SPRING_APPLICATION_NAME=discovery
+    ports: ["8761:8761"]
+    depends_on:
+      - config
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8761/" ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  config:
+    build:
+      context: .
+      dockerfile: services/config-server/Dockerfile
+    volumes:
+      - ./config-repo:/config:ro
+    ports:
+      - "8888:8888"
+    environment:
+      SPRING_PROFILES_ACTIVE: native
+      SPRING_APPLICATION_NAME: config
+      SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS: file:/config
+      SERVER_PORT: "8888"
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8888/actuator/health" ]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
 
 volumes:
   userdb-data:
